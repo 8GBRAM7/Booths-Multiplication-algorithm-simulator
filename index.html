@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Booth's Multiplication Algorithm Simulator | COA</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div>
+        <h1>Booth’s Multiplication Simulator</h1>
+        <p class="subtitle">Signed Two’s Complement Hardware ALU Visualizer</p>
+      </div>
+      <div class="badge">COA Mini-Project</div>
+    </header>
+
+    <!-- Input & Control Panel -->
+    <section class="panel control-panel">
+      <div class="inputs-grid">
+        <div class="input-group">
+          <label for="bitWidth">Register Bit-Width (n)</label>
+          <select id="bitWidth">
+            <option value="4" selected>4-Bit (-8 to +7)</option>
+            <option value="8">8-Bit (-128 to +127)</option>
+            <option value="16">16-Bit (-32768 to +32767)</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="multiplicand">Multiplicand (M)</label>
+          <input type="number" id="multiplicand" value="-6" />
+          <span class="range-hint" id="rangeHintM">Range: -8 to 7</span>
+        </div>
+
+        <div class="input-group">
+          <label for="multiplier">Multiplier (Q)</label>
+          <input type="number" id="multiplier" value="5" />
+          <span class="range-hint" id="rangeHintQ">Range: -8 to 7</span>
+        </div>
+
+        <div class="input-group speed-group">
+          <label for="speedRange">Auto-Play Speed: <span id="speedLabel">800ms</span></label>
+          <input type="range" id="speedRange" min="150" max="2000" step="50" value="800" />
+        </div>
+      </div>
+
+      <div id="errorBanner" class="error-banner hidden"></div>
+
+      <div class="button-bar">
+        <button id="initBtn" class="btn btn-primary">Initialize / Reset</button>
+        <button id="prevBtn" class="btn btn-secondary" disabled>◀ Prev Step</button>
+        <button id="nextBtn" class="btn btn-secondary" disabled>Next Step ▶</button>
+        <button id="autoBtn" class="btn btn-accent" disabled>▶ Auto-Play</button>
+        <button id="exportBtn" class="btn btn-outline" disabled>⬇ Export CSV</button>
+      </div>
+    </section>
+
+    <!-- Live Hardware Register Visualization -->
+    <section class="panel hardware-panel">
+      <div class="panel-header">
+        <h2>Live ALU Register State</h2>
+        <div id="decisionPill" class="decision-pill neutral">Ready to Initialize</div>
+      </div>
+
+      <!-- Constant Registers M and -M -->
+      <div class="constant-registers">
+        <div class="const-box">
+          <span class="reg-title">M (Multiplicand)</span>
+          <code id="regM" class="bit-row">0000</code>
+          <span id="decM" class="dec-sub">0</span>
+        </div>
+        <div class="const-box">
+          <span class="reg-title">-M (Two's Complement)</span>
+          <code id="regNegM" class="bit-row">0000</code>
+          <span id="decNegM" class="dec-sub">0</span>
+        </div>
+        <div class="const-box">
+          <span class="reg-title">SC (Sequence Counter)</span>
+          <code id="regSC" class="bit-row sc-val">4</code>
+          <span class="dec-sub">Cycles Remaining</span>
+        </div>
+      </div>
+
+      <!-- Active Shift Registers [A | Q | Q-1] -->
+      <div class="shift-bus">
+        <div class="register-block">
+          <div class="reg-label">Accumulator (A)</div>
+          <div id="bitsA" class="bit-cells"></div>
+        </div>
+
+        <div class="bus-divider"></div>
+
+        <div class="register-block">
+          <div class="reg-label">Multiplier (Q)</div>
+          <div id="bitsQ" class="bit-cells"></div>
+        </div>
+
+        <div class="bus-divider"></div>
+
+        <div class="register-block">
+          <div class="reg-label">Q<sub>-1</sub></div>
+          <div id="bitsQ1" class="bit-cells"></div>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="legend">
+        <span><i class="dot dot-add"></i> Q<sub>0</sub>Q<sub>-1</sub> = 01 (A ← A + M)</span>
+        <span><i class="dot dot-sub"></i> Q<sub>0</sub>Q<sub>-1</sub> = 10 (A ← A - M)</span>
+        <span><i class="dot dot-shift"></i> Q<sub>0</sub>Q<sub>-1</sub> = 00 / 11 (Shift Only)</span>
+      </div>
+    </section>
+
+    <!-- Final Verification Banner -->
+    <section id="resultBanner" class="panel result-panel hidden">
+      <h2>Execution Complete — Product Verification</h2>
+      <div class="result-grid">
+        <div>
+          <span class="res-label">2n-Bit Binary Product [A, Q]</span>
+          <code id="finalBinary" class="res-value">00000000</code>
+        </div>
+        <div>
+          <span class="res-label">Signed Decimal Result</span>
+          <span id="finalDecimal" class="res-value highlight">0</span>
+        </div>
+        <div>
+          <span class="res-label">Arithmetic Check</span>
+          <span id="finalFormula" class="res-value">0 × 0 = 0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step-by-Step Trace Log Table -->
+    <section class="panel trace-panel">
+      <div class="panel-header">
+        <h2>Cycle-by-Cycle Execution Trace</h2>
+        <span id="cycleCounter" class="cycle-tag">Cycle: 0</span>
+      </div>
+      <div class="table-wrapper">
+        <table id="traceTable">
+          <thead>
+            <tr>
+              <th>Cycle</th>
+              <th>Q<sub>0</sub>Q<sub>-1</sub></th>
+              <th>Operation Performed</th>
+              <th>Accumulator (A)</th>
+              <th>Multiplier (Q)</th>
+              <th>Q<sub>-1</sub></th>
+              <th>SC</th>
+            </tr>
+          </thead>
+          <tbody id="traceBody">
+            <tr>
+              <td colspan="7" class="empty-row">Enter M and Q above, then click <strong>Initialize / Reset</strong>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
